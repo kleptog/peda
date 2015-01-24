@@ -324,6 +324,8 @@ def normalize_argv(args, size=0, convert=True):
                 args[idx] = as_int
 
     args += [None]*(size-len(args))
+    if size:
+        return args[:size]
     return args
 
 def to_hexstr(str):
