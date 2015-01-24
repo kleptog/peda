@@ -1851,16 +1851,6 @@ class PEDA(object):
             - list of found result: (address(Int), hex encoded value(String))
 
         """
-        result = []
-        if end < start:
-            (start, end) = (end, start)
-
-        if mem is None:
-            mem = self.dumpmem(start, end)
-
-        if not mem:
-            return result
-
         escape = 0
         if search.startswith("0x"): # hex number
             escape = 1
@@ -1874,6 +1864,24 @@ class PEDA(object):
 
         if isinstance(search, str):
             search = bytes(search)
+
+        return self._searchmem(start, end, search, mem)
+
+    def _searchmem(self, start, end, search, mem=None):
+        """
+        Like searchmem only search is now a binary string/regex and doesn't need more conversion.
+        """
+        assert isinstance(search, bytes)
+
+        result = []
+        if end < start:
+            (start, end) = (end, start)
+
+        if mem is None:
+            mem = self.dumpmem(start, end)
+
+        if not mem:
+            return result
 
         try:
             p = re.compile(search)
