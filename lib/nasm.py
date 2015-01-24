@@ -9,6 +9,7 @@
 import os
 from utils import *
 import config
+import codecs
 
 class Nasm(object):
     """
@@ -30,11 +31,11 @@ class Nasm(object):
         asmcode = asmcode.strip('"').strip("'")
         asmcode = asmcode.replace(";", "\n")
         asmcode = ("BITS %d\n" % mode) + asmcode
-        asmcode = asmcode.decode('string_escape')
+        asmcode = codecs.decode(asmcode, 'unicode_escape')
         asmcode = re.sub("PTR|ptr|ds:|DS:", "", asmcode)
         infd = tmpfile()
         outfd = tmpfile()
-        infd.write(asmcode)
+        infd.write(asmcode.encode('utf-8'))
         infd.flush()
         execute_external_command("%s -f bin -o %s %s" % (config.NASM, outfd.name, infd.name))
         infd.close()
@@ -74,14 +75,13 @@ class Nasm(object):
                 return ""
                 
             shellcode = []
-            pattern = re.compile("([0-9A-F]{8})\s*([^\s]*)\s*(.*)")
 
-            matches = pattern.findall(asmcode)
+            pattern = re.compile("([0-9A-F]{8})\s*([^\s]*)\s*(.*)")
             for line in asmcode.splitlines():
                 m = pattern.match(line)
                 if m:
                     (addr, bytes, code) = m.groups()
-                    sc = '"%s"' % to_hexstr(bytes.decode('hex'))
+                    sc = '"%s"' % to_hexstr(codecs.decode(bytes, 'hex'))
                     shellcode += [(sc, "0x"+addr, code)]
 
             maxlen = max([len(x[0]) for x in shellcode])

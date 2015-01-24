@@ -332,7 +332,10 @@ def to_hexstr(str):
     """
     Convert a string to hex escape represent
     """
-    return "".join(["\\x%02x" % ord(i) for i in str])
+    if str and isinstance(str[0], int):   #  Py3
+        return "".join(["\\x%02x" % i for i in str])
+    else:
+        return "".join(["\\x%02x" % ord(i) for i in str])
 
 def to_hex(num):
     """
@@ -626,27 +629,27 @@ def cyclic_pattern_charset(charset_type=None):
     """
 
     charset = []
-    charset += ["ABCDEFGHIJKLMNOPQRSTUVWXYZ"] # string.uppercase
-    charset += ["abcdefghijklmnopqrstuvwxyz"] # string.lowercase
-    charset += ["0123456789"] # string.digits
+    charset += [b"ABCDEFGHIJKLMNOPQRSTUVWXYZ"] # string.uppercase
+    charset += [b"abcdefghijklmnopqrstuvwxyz"] # string.lowercase
+    charset += [b"0123456789"] # string.digits
 
     if not charset_type:
         charset_type = config.Option.get("pattern")
 
     if charset_type == 1: # extended type
-        charset[1] = "%$-;" + charset[1]
-        charset[2] = "sn()" + charset[2]
+        charset[1] = b"%$-;" + charset[1]
+        charset[2] = b"sn()" + charset[2]
 
     if charset_type == 2: # maximum type
-        charset += ['!"#$%&\()*+,-./:;<=>?@[\\]^_{|}~'] # string.punctuation
+        charset += [b'!"#$%&\()*+,-./:;<=>?@[\\]^_{|}~'] # string.punctuation
 
-    mixed_charset = mixed = ''
+    mixed_charset = mixed = b''
     k = 0
     while True:
         for i in range(0, len(charset)): mixed += charset[i][k:k+1]
         if not mixed: break
         mixed_charset += mixed
-        mixed = ''
+        mixed = b''
         k+=1
 
     return mixed_charset
@@ -677,7 +680,8 @@ def de_bruijn(charset, n, maxlen):
                 a[t] = j
                 db(t + 1, t)
     db(1,1)
-    return ''.join(sequence)
+    # Works on Py2 and Py3
+    return bytes(bytearray(sequence))
 
 @memoized
 def cyclic_pattern(size=None, start=None, charset_type=None):
@@ -729,6 +733,8 @@ def cyclic_pattern_offset(value):
     else:
         search = hex2str(to_int(value))
 
+    if isinstance(search, unicode):
+        search = search.encode('ascii')
     pos = pattern.find(search)
     return pos if pos != -1 else None
 
@@ -745,7 +751,7 @@ def cyclic_pattern_search(buf):
     result = []
     pattern = cyclic_pattern()
 
-    p = re.compile("[%s]{4,}" % re.escape(cyclic_pattern_charset()))
+    p = re.compile(b"[" + re.escape(cyclic_pattern_charset()) + b"]{4,}")
     found = p.finditer(buf)
     found = list(found)
     for m in found:

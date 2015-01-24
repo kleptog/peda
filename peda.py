@@ -26,10 +26,8 @@ try:
 except:
     import pickle
 
-# if sys.version[0] != "3":
-    # raise Exception("Python2 is not supported at the moment, upgrade your GDB or use http://github.com/longld/peda")
-
-bytes = encode
+if sys.version[0] != "3":
+    bytes = encode
 
 # point to absolute path of peda.py
 PEDAFILE = os.path.abspath(os.path.expanduser(__file__))
@@ -1790,7 +1788,7 @@ class PEDA(object):
         length = min(len(mem), len(buf))
         result = {}
         lineno = 0
-        for i in range(length/line_len):
+        for i in range(length//line_len):
             diff = 0
             bytes = []
             for j in range(line_len):
@@ -1866,7 +1864,7 @@ class PEDA(object):
             search = re.escape(search)
 
         if isinstance(search, str):
-            search = bytes(search)
+            search = search.encode('utf-8')
 
         return self._searchmem(start, end, search, mem)
 
@@ -2280,17 +2278,17 @@ class PEDA(object):
             fd.seek(start, 0)
             mem = fd.read(end-start)
             fd.close()
-        dynstrings = mem.split("\x00")
+        dynstrings = mem.split(b"\x00")
 
         if pattern:
-            dynstrings = [s for s in dynstrings if re.search(pattern, s)]
+            dynstrings = [s for s in dynstrings if re.search(pattern.encode('ascii'), s)]
 
         # get symname@plt info
         symbols = {}
         for symname in dynstrings:
             if not symname: continue
-            symname += "@plt"
-            out = self.execute_redirect("info functions %s" % symname)
+            symname += b"@plt"
+            out = self.execute_redirect("info functions %s" % symname.decode('ascii'))
             if not out: continue
             m = re.findall(".*(0x[^ ]*)\s*%s" % re.escape(symname), out)
             for addr in m:
@@ -2595,7 +2593,7 @@ class PEDA(object):
         magic_bytes = ["0x00", "0xff", "0xdead", "0xdeadbeef", "0xdeadbeefdeadbeef"]
 
         ops = [x for x in asmcode.split(';') if x]
-        def buildcode(code="", pos=0, depth=0):
+        def buildcode(code=b"", pos=0, depth=0):
             if depth == wildcard and pos == len(ops):
                 yield code
                 return
@@ -2622,18 +2620,24 @@ class PEDA(object):
 
         searches = []
         for machine_code in buildcode():
+            if not machine_code:
+                continue
             search = re.escape(machine_code)
-            search = search.replace(re.escape("dead".decode('hex')),"..")\
-                .replace(re.escape("beef".decode('hex')),"..")\
-                .replace(re.escape("00".decode('hex')),".")\
-                .replace(re.escape("ff".decode('hex')),".")
+            search = search.replace(re.escape(codecs.decode(b"dead",'hex')),b"..")\
+                .replace(re.escape(codecs.decode(b"beef",'hex')),b"..")\
+                .replace(re.escape(codecs.decode(b"00",'hex')),b".")\
+                .replace(re.escape(codecs.decode(b"ff",'hex')),b".")
 
             if rop and 'ret' not in asmcode:
-                search = search + ".{0,24}\\xc3"
-            searches.append("%s" % (search))
+                search = search + b".{0,24}\\xc3"
+            searches.append(search)
 
-        search = "(?=(%s))" % ("|".join(searches))
-        candidates = self.searchmem(start, end, search)
+        if not searches:
+            warning_msg("Failed to generate search string")
+            return []
+
+        search = b"(?=(" + (b"|".join(searches)) + b"))"
+        candidates = self._searchmem(start, end, search)
 
         if rop:
             result = {}
@@ -2685,7 +2689,7 @@ class PEDA(object):
 
         if len(mem) > 20000: # limit backward depth if searching in large mem
             depth = 3
-        found = re.finditer("\xc3", mem)
+        found = re.finditer(b"\xc3", mem)
         found = list(found)
         for m in found:
             idx = start+m.start()
@@ -2786,23 +2790,23 @@ class PEDA(object):
         P2REG = {0: "[eax]", 1: "[ecx]", 2: "[edx]", 3: "[ebx]", 6: "[esi]", 7:"[edi]"}
         OPCODE = {0xe: "jmp", 0xd: "call"}
         P2OPCODE = {0x1: "call", 0x2: "jmp"}
-        JMPREG = ["\xff" + chr(i) for i in range(0xe0, 0xe8)]
-        JMPREG += ["\xff" + chr(i) for i in range(0x20, 0x28)]
-        CALLREG = ["\xff" + chr(i) for i in range(0xd0, 0xd8)]
-        CALLREG += ["\xff" + chr(i) for i in range(0x10, 0x18)]
+        JMPREG = [b"\xff" + bytes(bytearray((i,))) for i in range(0xe0, 0xe8)]
+        JMPREG += [b"\xff" + bytes(bytearray((i,))) for i in range(0x20, 0x28)]
+        CALLREG = [b"\xff" + bytes(bytearray((i,))) for i in range(0xd0, 0xd8)]
+        CALLREG += [b"\xff" + bytes(bytearray((i,))) for i in range(0x10, 0x18)]
         JMPCALL = JMPREG + CALLREG
 
         if regname is None:
             regname = ""
         regname = regname.lower()
-        pattern = re.compile('|'.join(JMPCALL).replace(' ', '\ '))
+        pattern = re.compile(b'|'.join(JMPCALL).replace(b' ', b'\ '))
         mem = self.dumpmem(start, end)
         found = pattern.finditer(mem)
         (arch, bits) = self.getarch()
         for m in list(found):
             inst = ""
             addr = start + m.start()
-            opcode = encode(m.group()[1],'hex')
+            opcode = "%X" % ord(m.group()[:1])
             type = int(opcode[0], 16)
             reg = int(opcode[1], 16)
             if type in OPCODE:
@@ -4477,8 +4481,8 @@ class PEDACmd(object):
                 for (start, end, _, _) in maps:
                     mem = peda.dumpmem(start, end)
                     if mem is None: # nullify unreadable memory
-                        mem = "\x00"*(end-start)
-                    fd.write(bytes(mem, 'UTF-8'))
+                        mem = b"\x00"*(end-start)
+                    fd.write(mem)
                     count += end - start
                 fd.close()
                 msg("Dumped %d bytes to '%s'" % (count, filename))
@@ -5172,7 +5176,7 @@ class PEDACmd(object):
             msg("Writing ROP gadgets to file: %s ..." % outfile)
             for (code, addr) in sorted(list(result.items()), key = lambda x:len(x[0])):
                 text += "0x%x: %s\n" % (addr, code)
-                fd.write(bytes("0x%x: %s\n" % (addr, code), 'UTF-8'))
+                fd.write("0x%x: %s\n" % (addr, code))
             fd.close()
 
         pager(text)
@@ -5255,7 +5259,7 @@ class PEDACmd(object):
             open(filename, "w").write(bytes(pattern, 'UTF-8'))
             msg("Writing pattern of %d chars to filename \"%s\"" % (len(pattern), filename))
         else:
-            msg("'" + pattern + "'")
+            msg("'" + pattern.decode('ascii') + "'")
 
         return
 
@@ -5574,7 +5578,7 @@ class PEDACmd(object):
             address = 0xdeadbeef
 
         inst_list = []
-        inst_code = ""
+        inst_code = b""
         # fetch instruction loop
         while True:
             inst = input("iasm|0x%x> " % address)
@@ -5597,7 +5601,7 @@ class PEDACmd(object):
             inst_code += bincode
             msg("hexify: \"%s\"" % to_hexstr(bincode))
 
-        text = Nasm.format_shellcode("".join([x[1] for x in inst_list]), mode)
+        text = Nasm.format_shellcode(b"".join([x[1] for x in inst_list]), mode)
         if text:
             msg("Assembled%s instructions:" % ("/Executed" if exec_mode else ""))
             msg(text)
