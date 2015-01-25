@@ -1784,7 +1784,7 @@ class PEDA(object):
             (start, end) = (end, start)
 
         mem = self.dumpmem(start, end)
-        if mem is None:
+        if not mem:
             return None
 
         length = min(len(mem), len(buf))
@@ -2675,7 +2675,7 @@ class PEDA(object):
         EXTRA_WORDS = ["BYTE ", " WORD", "DWORD ", "FWORD ", "QWORD ", "PTR ", "FAR "]
         result = {}
         mem = self.dumpmem(start, end)
-        if mem is None:
+        if not mem:
             return {}
 
         if keyword:
@@ -3311,7 +3311,7 @@ class PEDACmd(object):
         if address is None:
             self._missing_argument()
 
-        count = lineline if count is None else count
+        count = linelen if count is None else count
         if isinstance(count,str):
             count = count.strip('/')
             count = linelen * to_int(count)
@@ -4434,11 +4434,11 @@ class PEDACmd(object):
                 if line.strip() == "": continue
                 if line == "end":
                     break
-                input = line.strip()
-                if input.startswith("0x"):
-                    data += hex2str(input)
+                line = line.strip()
+                if line.startswith("0x"):
+                    data += hex2str(line)
                 else:
-                    data += eval("%s" % input)
+                    data += eval("%s" % line)
 
         if to_int(data) is not None:
             data = hex2str(to_int(data), peda.instsize())
