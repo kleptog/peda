@@ -1401,15 +1401,18 @@ class PEDA(object):
             binmap = []
             hlist = [x for x in list(headers.items()) if x[1][2] == 'code']
             hlist = sorted(hlist, key=lambda x:x[1][0])
-            binmap += [(hlist[0][1][0], hlist[-1][1][1], "rx-p", name)]
+            if hlist:
+                binmap += [(hlist[0][1][0], hlist[-1][1][1], "rx-p", name)]
 
             hlist = [x for x in list(headers.items()) if x[1][2] == 'rodata']
             hlist = sorted(hlist, key=lambda x:x[1][0])
-            binmap += [(hlist[0][1][0], hlist[-1][1][1], "r--p", name)]
+            if hlist:
+                binmap += [(hlist[0][1][0], hlist[-1][1][1], "r--p", name)]
 
             hlist = [x for x in list(headers.items()) if x[1][2] == 'data']
             hlist = sorted(hlist, key=lambda x:x[1][0])
-            binmap += [(hlist[0][1][0], hlist[-1][1][1], "rw-p", name)]
+            if hlist:
+                binmap += [(hlist[0][1][0], hlist[-1][1][1], "rw-p", name)]
 
             return binmap
 
